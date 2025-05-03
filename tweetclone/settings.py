@@ -28,6 +28,8 @@ SECRET_KEY = 'django-insecure-bubi#s&7_3x^*tnd^$4q8*(gfjd(3fb(yi($qki*7l5y4i+(nz
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+LOGIN_URL = '/login'  # URL de redirecionamento para o login do admin caso o usuário não esteja autenticado
+MAX_TWEET_LENGTH = 240
 
 
 
@@ -40,8 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    'tweets'
+    #third-party
+    'rest_framework',
+    #internal
+    'tweets' 
 ]
 
 MIDDLEWARE = [
@@ -124,6 +128,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+DEFAULT_RENDERER_CLASSES = [
+    'rest_framework.renderers.JSONRenderer',
+]
+if DEBUG:
+    DEFAULT_RENDERER_CLASSES += [
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ]
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication'
+      ],
+    'DEFAULT_RENDERER_CLASSES': DEFAULT_RENDERER_CLASSES
+}
+  
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

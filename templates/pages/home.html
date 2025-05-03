@@ -57,41 +57,48 @@
   }
 
   async function handleTweetCreateFormDidSubmit(event) {
-      event.preventDefault();
+    event.preventDefault();
 
-      const form = event.target;
-      const formData = new FormData(form);
-      const url = form.getAttribute('action');
-      const method = form.getAttribute('method');
+    const form = event.target;
+    const formData = new FormData(form);
+    const url = form.getAttribute('action');
+    const method = form.getAttribute('method');
 
-      // Limpa os erros antes de enviar o formulário
-      const errorDiv = document.getElementById('tweet-create-form-error');
-      errorDiv.classList.add('d-none');  // Esconde o erro antes de tentar enviar novamente
+    const errorDiv = document.getElementById('tweet-create-form-error');
+    errorDiv.classList.add('d-none');
 
-      try {
-          const response = await fetch(url, {
-              method: method,
-              headers: {
-                  'X-Requested-With': 'XMLHttpRequest'
-              },
-              body: formData
-          });
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
 
-          if (!response.ok) {
-              const errorData = await response.json();
-              console.error('Erro do servidor:', errorData);
-              displayFormErrors(errorData);
-              return;
-          }
+        if (response.status === 401) {
+            alert("You must login!");
+            window.location.href = '/login';  // ajuste aqui se necessário
+            return;
+        }
 
-          const serverResponse = await response.json();
-          console.log('Tweet criado:', serverResponse);
-          fetchTweets();
-          form.reset();
-      } catch (error) {
-          console.error('Erro ao enviar o tweet:', error);
-      }
-  }
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Erro do servidor:', errorData);
+            displayFormErrors(errorData);
+            return;
+        }
+
+        const serverResponse = await response.json();
+        console.log('Tweet criado:', serverResponse);
+        fetchTweets();
+        form.reset();
+    } catch (error) {
+        console.error('Erro ao enviar o tweet:', error);
+    }
+}
+
+
 
   // Evento de escuta para esconder o erro quando o usuário começar a digitar
   const tweetTextArea = document.querySelector('textarea[name="content"]');
@@ -111,7 +118,7 @@
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      renderTweets(data.response);
+      renderTweets(data);
     } catch (error) {
       console.error('Fetch error:', error);
       tweetsElement.innerHTML = '<p>Error loading tweets.</p>';
