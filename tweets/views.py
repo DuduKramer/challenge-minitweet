@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .forms import TweetForm
 from .models import Tweet
-from .serielizers import TweetSerializer
+from .serielizers import TweetSerializer, TweetLikeSerializer
 
 ALLOWED_HOSTS = settings.ALLOWED_HOSTS
 
@@ -41,21 +41,48 @@ def tweet_delete_view(request, tweet_id, *args, **kwargs):
     tweet.delete()
     return Response({"message": "Tweet deleted"}, status=200)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def tweet_like_toggle_view(request, tweet_id, *args, **kwargs):
+    # Procurar o tweet
+    tweet = Tweet.objects.filter(id=tweet_id).first()
+    if not tweet:
+        return Response({"message": "Tweet not found"}, status=404)
+
+    # Verificando o tipo de ação
+    action = request.data.get('action')
+    if action not in ["like", "unlike"]:
+        return Response({"message": "Invalid action"}, status=400)
+
+    # Se a ação for 'like'
+    user = request.user
+    if action == "like":
+        if user in tweet.likes.all():
+            tweet.likes.remove(user)
+            liked = False
+        else:
+            tweet.likes.add(user)
+            liked = True
+
+    # Se a ação for 'unlike'
+    elif action == "unlike":
+        if user in tweet.likes.all():
+            tweet.likes.remove(user)
+            liked = False
+        else:
+            liked = False
+
+    # Resposta com a contagem de likes
+    return Response({
+        "liked": liked,
+        "likes_count": tweet.likes.count()
+    }, status=200)
 
 @api_view(['GET'])
 def tweet_list_view(request, *args, **kwargs):
     qs = Tweet.objects.all()
     serializer = TweetSerializer(qs, many=True)
     return Response(serializer.data)
-
-# Lista de tweets
-def tweet_list_view_pure_django(request, *args, **kwargs):
-    qs = Tweet.objects.all()
-    tweets_list = [
-        {"id": tweet.id, "content": tweet.content, "likes": random.randint(0, 200)}
-        for tweet in qs
-    ]
-    return JsonResponse({"isUser": False, "response": tweets_list}, status=200)
 
 @api_view(['POST'])
 #@authentication_classes([SessionAuthentication, MyCustomAuth]) 
@@ -66,6 +93,8 @@ def tweet_create_view(request, *args, **kwargs):
         serializer.save(user=request.user)
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
+
+
 # Criação de um novo tweet
 def tweet_create_view_pure_django(request, *args, **kwargs):
     if not request.user.is_authenticated:
@@ -97,6 +126,15 @@ def tweet_create_view_pure_django(request, *args, **kwargs):
 
     return render(request, "components/form.html", context={"form": form})
 
+
+# Lista de tweets
+def tweet_list_view_pure_django(request, *args, **kwargs):
+    qs = Tweet.objects.all()
+    tweets_list = [
+        {"id": tweet.id, "content": tweet.content, "likes": random.randint(0, 200)}
+        for tweet in qs
+    ]
+    return JsonResponse({"isUser": False, "response": tweets_list}, status=200)
 
 # Detalhes de um tweet específico
 def tweet_detail_view_pure_django(request, tweet_id, *args, **kwargs):

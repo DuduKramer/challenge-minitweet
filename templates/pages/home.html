@@ -9,14 +9,12 @@
 
 <div class="row mb-3">
   <div class="col-md-4 mx-auto col-10">
-    <!-- Exibição de erros -->
-    <div id="tweet-create-form-error" class="d-none alert alert-danger"></div>
-    
-    <form class="form" id="tweet-create-form" method="POST" action="/create-tweet">
+    <div id="tweet-error" class="d-none alert alert-danger"></div>
+    <form id="tweet-form" class="form" method="POST" action="/create-tweet">
       {% csrf_token %}
-      <input type="hidden" value="/" name="next" />
-      <textarea required="required" class="form-control" name="content" placeholder="your tweet..."></textarea>
-      <button type="submit" class="btn btn-primary">Tweet</button>
+      <input type="hidden" name="next" value="/" />
+      <textarea required class="form-control" name="content" placeholder="Your tweet..."></textarea>
+      <button type="submit" class="btn btn-primary mt-2">Tweet</button>
     </form>
   </div>
 </div>
@@ -26,150 +24,164 @@
 </div>
 
 <script>
-  function handleTweetError(msg, display) {
-      var myErrorDiv = document.getElementById('tweet-create-form-error');
-      if(display === true){
-        myErrorDiv.setAttribute('class', "d-block alert alert-danger");
-        myErrorDiv.innerText = msg;
-      }else{
-        myErrorDiv.setAttribute('class', "d-none alert alert-danger");
-      }
-  }
-    
-  function displayFormErrors(errors) {
-      const errorDiv = document.getElementById('tweet-create-form-error');
-      errorDiv.classList.remove('d-none');
-      errorDiv.innerHTML = '';  // Limpa os erros anteriores
-      
-      // Exibindo os erros de cada campo
-      for (const [field, messages] of Object.entries(errors)) {
-          messages.forEach(message => {
-              const errorMessage = document.createElement('p');
-              errorMessage.textContent = `${message}`;
-              errorDiv.appendChild(errorMessage);
-          });
-      }
+  const getCSRFToken = () => {
+    return document.cookie
+      .split('; ')
+      .find(row => row.startsWith('csrftoken='))
+      ?.split('=')[1] || '';
+  };
 
-      // Remove o erro após 5 segundos
-      setTimeout(() => {
-          errorDiv.classList.add('d-none');
-      }, 5000);  // Tempo em milissegundos (5000ms = 5 segundos)
-  }
+  const showError = (msg) => {
+    const errorDiv = document.getElementById('tweet-error');
+    errorDiv.textContent = msg;
+    errorDiv.classList.remove('d-none');
+    setTimeout(() => errorDiv.classList.add('d-none'), 5000);
+  };
 
-  async function handleTweetCreateFormDidSubmit(event) {
-    event.preventDefault();
+  const clearError = () => {
+    document.getElementById('tweet-error').classList.add('d-none');
+  };
 
-    const form = event.target;
-    const formData = new FormData(form);
-    const url = form.getAttribute('action');
-    const method = form.getAttribute('method');
-
-    const errorDiv = document.getElementById('tweet-create-form-error');
-    errorDiv.classList.add('d-none');
-
-    try {
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: formData
-        });
-
-        if (response.status === 401) {
-            alert("You must login!");
-            window.location.href = '/login';  // ajuste aqui se necessário
-            return;
-        }
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Erro do servidor:', errorData);
-            displayFormErrors(errorData);
-            return;
-        }
-
-        const serverResponse = await response.json();
-        console.log('Tweet criado:', serverResponse);
-        fetchTweets();
-        form.reset();
-    } catch (error) {
-        console.error('Erro ao enviar o tweet:', error);
-    }
-}
-
-
-
-  // Evento de escuta para esconder o erro quando o usuário começar a digitar
-  const tweetTextArea = document.querySelector('textarea[name="content"]');
-  tweetTextArea.addEventListener('input', () => {
-      const errorDiv = document.getElementById('tweet-create-form-error');
-      errorDiv.classList.add('d-none');  // Esconde o erro assim que o usuário começa a digitar
-  });
-
-  const tweetCreateFormEl = document.getElementById('tweet-create-form');
-  tweetCreateFormEl.addEventListener('submit', handleTweetCreateFormDidSubmit);
-
-  const tweetsElement = document.getElementById('tweets-container');
-  const apiUrl = "/tweets";
-
-  async function fetchTweets() {
-    try {
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
-      renderTweets(data);
-    } catch (error) {
-      console.error('Fetch error:', error);
-      tweetsElement.innerHTML = '<p>Error loading tweets.</p>';
-    }
-  }
-
-  function handleLike(tweetId, button) {
-    let count = parseInt(button.dataset.likes, 10) + 1;
-    button.dataset.likes = count;
-    button.textContent = `Like (${count})`;
-    console.log(`You liked tweet #${tweetId}. Current likes: ${count}`);
-  }
-
-  function createLikeButton(tweetId, likes) {
-    const button = document.createElement('button');
-    button.className = 'btn btn-sm btn-primary ml-2';
-    button.textContent = `Like (${likes})`;
-    button.dataset.likes = likes;
-    button.addEventListener('click', () => handleLike(tweetId, button));
-    return button;
-  }
-
-  function createTweetElement({ id, content, likes }) {
+  const createTweetElement = ({ id, content, likes }) => {
     const tweetDiv = document.createElement('div');
     tweetDiv.className = 'tweet col-12 border rounded mb-3 p-3 bg-dark text-light';
 
-    const contentP = document.createElement('p');
-    contentP.className = 'fs-6 mb-2';
-    contentP.textContent = content;
+    tweetDiv.innerHTML = `
+    <p class="fs-6 mb-2">${content}</p>
+    <button class="btn btn-sm btn-primary like-btn" data-id="${id}" data-likes="${likes}" data-liked="false">
+      Like (${likes})
+    </button>
+  `;
 
-    const likeButton = createLikeButton(id, likes);
-
-    tweetDiv.append(contentP, likeButton);
+    tweetDiv.querySelector('.like-btn').addEventListener('click', handleLike);
     return tweetDiv;
-  }
+  };
 
-  function renderTweets(tweets) {
-    tweetsElement.innerHTML = '';
+  const renderTweets = (tweets) => {
+    const container = document.getElementById('tweets-container');
+    container.innerHTML = '';
 
-    if (!tweets || tweets.length === 0) {
-      tweetsElement.innerHTML = '<p>No tweets available.</p>';
+    if (!tweets.length) {
+      container.innerHTML = '<p>No tweets available.</p>';
       return;
     }
 
     tweets.forEach(tweet => {
       const tweetEl = createTweetElement(tweet);
-      tweetsElement.appendChild(tweetEl);
+      container.appendChild(tweetEl);
     });
-  }
+  };
 
-  window.addEventListener('DOMContentLoaded', fetchTweets);
+  const fetchTweets = async () => {
+    try {
+      const res = await fetch('/tweets');
+      if (!res.ok) throw new Error('Failed to load tweets');
+      const data = await res.json();
+      renderTweets(data);
+    } catch (err) {
+      console.error(err);
+      document.getElementById('tweets-container').innerHTML = '<p>Error loading tweets.</p>';
+    }
+  };
+
+  const handleTweetSubmit = async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const form = e.target;
+    const formData = new FormData(form);
+
+    try {
+      const res = await fetch(form.action, {
+        method: form.method,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+      });
+
+      if (res.status === 401) {
+        window.location.href = '/login';
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        const messages = Object.values(errorData).flat().join(' ');
+        showError(messages);
+        return;
+      }
+
+      await res.json();
+      form.reset();
+      fetchTweets();
+    } catch (err) {
+      console.error('Tweet submit error:', err);
+      showError('Error submitting tweet.');
+    }
+  };
+
+  async function handleLike(event) {
+  const button = event.currentTarget;
+  const tweetId = button.dataset.id;
+  let localCount = parseInt(button.dataset.likes, 10);
+  const action = button.dataset.liked === 'true' ? 'unlike' : 'like';
+  const url = `/api/tweet/${tweetId}/like-toggle/`;  // Updated to match your URL pattern
+
+  // Atualiza localmente para dar feedback rápido
+  if (action === 'like') {
+      localCount += 1;
+      button.dataset.liked = 'true';
+  } else {
+      localCount -= 1;
+      button.dataset.liked = 'false';
+  }
+  
+  button.dataset.likes = localCount;
+  button.textContent = `Like (${localCount})`;
+
+  const csrfToken = getCSRFToken();  // Use the existing getCSRFToken function
+
+  try {
+      const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({ action: action })
+      });
+
+      if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+
+      // Atualiza o botão com a nova contagem de likes
+      button.dataset.likes = responseData.likes_count;
+      button.textContent = `Like (${responseData.likes_count})`;
+      button.dataset.liked = responseData.liked.toString();
+
+  } catch (error) {
+      console.error('Failed to update like:', error);
+
+      // Opcional: reverter o contador local se der erro
+      let revertedCount = action === 'like' ? localCount - 1 : localCount + 1;
+      button.dataset.likes = revertedCount;
+      button.textContent = `Like (${revertedCount})`;
+
+      alert('Could not register your like. Please try again.');
+  }
+}
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchTweets();
+
+    const form = document.getElementById('tweet-form');
+    form.addEventListener('submit', handleTweetSubmit);
+
+    form.querySelector('textarea').addEventListener('input', clearError);
+  });
 </script>
 
 {% endblock content %}

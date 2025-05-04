@@ -3,6 +3,7 @@ from django.urls import path, re_path
 
 from tweets.views import(
   home_view, 
+  tweet_like_toggle_view,
   tweet_detail_view, 
   tweet_delete_view,
   tweet_list_view, 
@@ -16,4 +17,5 @@ urlpatterns = [
     path('tweets', tweet_list_view),
     path('tweets/<int:tweet_id>', tweet_detail_view),
     path('api/tweets/<int:tweet_id>/delete', tweet_delete_view),
+    path('api/tweet/<int:tweet_id>/like-toggle/', tweet_like_toggle_view)  
 ]
