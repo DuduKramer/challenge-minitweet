@@ -15,6 +15,7 @@ from tweets.views import (
   register_user_view,
   register_page_view,
   login_page_view,
+  tweet_edit_view
 )
 
 urlpatterns = [
@@ -29,5 +30,6 @@ urlpatterns = [
     path('api/register/', register_user_view, name='register'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # Refresh do token
-     path('login/', login_page_view, name='login')
+     path('login/', login_page_view, name='login'),
+    path('api/tweets/<int:tweet_id>/edit/', tweet_edit_view, name='tweet_edit'),
 ]

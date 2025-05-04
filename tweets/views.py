@@ -44,6 +44,25 @@ def register_user_view(request):
     user = User.objects.create_user(username=username, password=password, email=email)
     return Response({"message": "User registered successfully."}, status=status.HTTP_201_CREATED)
 
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])  # Exige autenticação
+def tweet_edit_view(request, tweet_id, *args, **kwargs):
+    try:
+        tweet = Tweet.objects.get(id=tweet_id)
+    except Tweet.DoesNotExist:
+        return Response({"message": "Tweet not found"}, status=404)
+
+    # Verifica se o usuário autenticado é o autor do tweet
+    if tweet.user != request.user:
+        return Response({"message": "You do not have permission to edit this tweet"}, status=403)
+
+    # Atualiza o conteúdo do tweet
+    serializer = TweetSerializer(tweet, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=200)
+    return Response(serializer.errors, status=400)
+
 # Detalhes de um tweet
 @api_view(['GET'])
 def tweet_detail_view(request, tweet_id, *args, **kwargs):
@@ -56,7 +75,7 @@ def tweet_detail_view(request, tweet_id, *args, **kwargs):
 
 # Exclusão de um tweet
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])  # Exige autenticação
 def tweet_delete_view(request, tweet_id, *args, **kwargs):
     try:
         tweet = Tweet.objects.get(id=tweet_id)
@@ -68,10 +87,9 @@ def tweet_delete_view(request, tweet_id, *args, **kwargs):
 
     tweet.delete()
     return Response({"message": "Tweet deleted"}, status=200)
-
 # Curtir ou descurtir um tweet
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])  # Exige autenticação
 def tweet_like_toggle_view(request, tweet_id, *args, **kwargs):
     tweet = Tweet.objects.filter(id=tweet_id).first()
     if not tweet:
@@ -83,24 +101,16 @@ def tweet_like_toggle_view(request, tweet_id, *args, **kwargs):
 
     user = request.user
     if action == "like":
-        if user in tweet.likes.all():
-            tweet.likes.remove(user)
-            liked = False
-        else:
-            tweet.likes.add(user)
-            liked = True
+        tweet.likes.add(user)
+        liked = True
     elif action == "unlike":
-        if user in tweet.likes.all():
-            tweet.likes.remove(user)
-            liked = False
-        else:
-            liked = False
+        tweet.likes.remove(user)
+        liked = False
 
     return Response({
         "liked": liked,
         "likes_count": tweet.likes.count()
     }, status=200)
-
 # Listagem de tweets
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])  # Exige autenticação

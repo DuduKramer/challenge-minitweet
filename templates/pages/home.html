@@ -43,17 +43,39 @@ const createTweetElement = ({ id, content, likes, username }) => {
 
   tweetDiv.innerHTML = `
     <p class="fs-6 mb-2"><strong>${username}</strong></p>
-    <p class="fs-6 mb-2">${content}</p>
+    <p class="fs-6 mb-2" id="tweet-content-${id}">${content}</p>
     <button class="btn btn-sm btn-primary like-btn" data-id="${id}" data-likes="${likes}" data-liked="false">
       Like (${likes})
     </button>
     <button class="btn btn-sm btn-danger delete-btn" data-id="${id}">
       Delete
     </button>
+    ${username === localStorage.getItem('username') ? `
+      <button class="btn btn-sm btn-warning edit-btn" data-id="${id}">
+        Edit
+      </button>
+    ` : ''}
   `;
 
-  tweetDiv.querySelector('.like-btn').addEventListener('click', handleLike);
-  tweetDiv.querySelector('.delete-btn').addEventListener('click', handleDelete);
+  // Adiciona o evento de curtir
+  const likeButton = tweetDiv.querySelector('.like-btn');
+  likeButton.addEventListener('click', handleLike);
+
+  // Adiciona o evento de deletar
+  const deleteButton = tweetDiv.querySelector('.delete-btn');
+  deleteButton.addEventListener('click', handleDelete);
+
+  // Adiciona o evento de edição
+  const editButton = tweetDiv.querySelector('.edit-btn');
+  if (editButton) {
+    editButton.addEventListener('click', () => {
+      const newContent = prompt('Edit your tweet:', content);
+      if (newContent) {
+        handleEditTweet(id, newContent);
+      }
+    });
+  }
+
   return tweetDiv;
 };
 
@@ -63,24 +85,31 @@ const handleDelete = async (event) => {
 
   if (!confirm("Are you sure you want to delete this tweet?")) return;
 
+  const jwtToken = localStorage.getItem('access'); // Obtém o token de acesso
+
   try {
-    const jwtToken = getJWTToken();
-    const res = await fetch(`/api/tweets/${tweetId}/delete`, {
+    const response = await fetch(`/api/tweets/${tweetId}/delete`, {
       method: 'DELETE',
       headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Authorization': `Bearer ${jwtToken}`,
+        'Authorization': `Bearer ${jwtToken}`, // Inclui o token no cabeçalho
+        'Content-Type': 'application/json',
       },
     });
 
-    if (!res.ok) throw new Error('Failed to delete tweet');
-    button.closest('.tweet').remove();
-  } catch (err) {
-    console.error('Delete error:', err);
-    alert('Error deleting tweet. Please try again.');
+    if (!response.ok) {
+      if (response.status === 403) {
+        alert('You do not have permission to delete this tweet.');
+        return;
+      }
+      throw new Error('Failed to delete tweet');
+    }
+
+    button.closest('.tweet').remove(); // Remove o tweet do DOM
+  } catch (error) {
+    console.error('Failed to delete tweet:', error);
+    alert('Could not delete tweet. Please try again.');
   }
 };
-
 const renderTweets = (tweets) => {
   const container = document.getElementById('tweets-container');
   container.innerHTML = '';
@@ -97,12 +126,18 @@ const renderTweets = (tweets) => {
 };
 
 const fetchTweets = async () => {
-  const token = getJWTToken(); // Usando função getJWTToken
+  const token = localStorage.getItem('access'); // Obtém o token de acesso do localStorage
+  if (!token) {
+    alert('You are not logged in. Redirecting to login page.');
+    window.location.href = '/login/';
+    return;
+  }
+
   try {
     const res = await fetch('/tweets', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${token}`, // Inclui o token no cabeçalho
         'Content-Type': 'application/json',
       },
     });
@@ -116,7 +151,7 @@ const fetchTweets = async () => {
     }
 
     const data = await res.json();
-    renderTweets(data);
+    renderTweets(data); // Função para renderizar os tweets no frontend
   } catch (err) {
     console.error(err.message);
     document.getElementById('tweets-container').innerHTML = '<p>Error loading tweets.</p>';
@@ -129,7 +164,13 @@ const handleTweetSubmit = async (e) => {
 
   const form = e.target;
   const formData = new FormData(form);
-  const token = localStorage.getItem('access_token'); // Obtém o token de acesso do localStorage
+  const token = localStorage.getItem('access'); // Certifique-se de que o token está armazenado como 'access'
+
+  if (!token) {
+    alert('You are not logged in. Redirecting to login page.');
+    window.location.href = '/login/';
+    return;
+  }
 
   try {
     const res = await fetch(form.action, {
@@ -142,7 +183,8 @@ const handleTweetSubmit = async (e) => {
     });
 
     if (res.status === 401) {
-      window.location.href = '/login';
+      alert('Unauthorized! Please log in again.');
+      window.location.href = '/login/';
       return;
     }
 
@@ -155,59 +197,78 @@ const handleTweetSubmit = async (e) => {
 
     await res.json();
     form.reset();
-    fetchTweets();
+    fetchTweets(); // Atualiza a lista de tweets
   } catch (err) {
     console.error('Tweet submit error:', err);
     showError('Error submitting tweet.');
   }
 };
 
+const handleEditTweet = async (tweetId, newContent) => {
+  const token = localStorage.getItem('access'); // Obtém o token de acesso do localStorage
+
+  try {
+    const res = await fetch(`/api/tweets/${tweetId}/edit/`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`, // Inclui o token no cabeçalho
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: newContent }),
+    });
+
+    if (res.status === 403) {
+      alert('You do not have permission to edit this tweet.');
+      return;
+    }
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Failed to edit tweet');
+    }
+
+    const data = await res.json();
+    alert('Tweet updated successfully!');
+    fetchTweets(); // Atualiza a lista de tweets
+  } catch (err) {
+    console.error('Edit tweet error:', err);
+    alert('Error editing tweet.');
+  }
+};
+
 async function handleLike(event) {
   const button = event.currentTarget;
   const tweetId = button.dataset.id;
-  let localCount = parseInt(button.dataset.likes, 10);
   const action = button.dataset.liked === 'true' ? 'unlike' : 'like';
   const url = `/api/tweet/${tweetId}/like-toggle/`;
 
-  if (action === 'like') {
-    localCount += 1;
-    button.dataset.liked = 'true';
-  } else {
-    localCount -= 1;
-    button.dataset.liked = 'false';
-  }
-
-  button.dataset.likes = localCount;
-  button.textContent = `Like (${localCount})`;
-
-  const jwtToken = getJWTToken();
+  const jwtToken = localStorage.getItem('access'); // Obtém o token de acesso
 
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Authorization': `Bearer ${jwtToken}`,
+        'Authorization': `Bearer ${jwtToken}`, // Inclui o token no cabeçalho
       },
       body: JSON.stringify({ action: action }),
     });
 
-    if (!response.ok) throw new Error(`Server error: ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 401) {
+        alert('Unauthorized! Please log in again.');
+        window.location.href = '/login/';
+        return;
+      }
+      throw new Error('Failed to update like');
+    }
 
-    const responseData = await response.json();
-    button.dataset.likes = responseData.likes_count;
-    button.textContent = `Like (${responseData.likes_count})`;
-    button.dataset.liked = responseData.liked.toString();
-
+    const data = await response.json();
+    button.dataset.liked = data.liked.toString();
+    button.textContent = `Like (${data.likes_count})`;
   } catch (error) {
     console.error('Failed to update like:', error);
-
-    let revertedCount = action === 'like' ? localCount - 1 : localCount + 1;
-    button.dataset.likes = revertedCount;
-    button.textContent = `Like (${revertedCount})`;
-
-    alert('Could not register your like. Please try again.');
+    alert('Could not update like. Please try again.');
   }
 }
 

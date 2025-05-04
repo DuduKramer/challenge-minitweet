@@ -40,11 +40,11 @@ const handleLogin = async (event) => {
     }
 
     const data = await res.json();
-    localStorage.setItem('access_token', data.access);  // Corrigir para 'access_token'
-    localStorage.setItem('refresh_token', data.refresh);  // Corrigir para 'refresh_token'
-    
+    localStorage.setItem('access', data.access); // Salva o token de acesso
+    localStorage.setItem('refresh', data.refresh); // Salva o token de refresh
+    localStorage.setItem('username', username); // Salva o nome de usuário
     alert('Login successful!');
-    window.location.href = '/';
+    window.location.href = '/'; // Redireciona para a página inicial
   } catch (err) {
     const errorDiv = document.getElementById('login-error');
     errorDiv.textContent = err.message;
