@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block head_title %}Login{% endblock head_title %}
+
+{% block content %}
+<div class="row text-center">
+  <h1>Login</h1>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-4 mx-auto col-10">
+    <div id="login-error" class="d-none alert alert-danger"></div>
+    <form id="login-form" class="form">
+      <input type="text" id="login-username" class="form-control mb-2" placeholder="Username" required />
+      <input type="password" id="login-password" class="form-control mb-2" placeholder="Password" required />
+      <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const handleLogin = async (event) => {
+  event.preventDefault();
+
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+
+  try {
+    const res = await fetch('/api/token/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Login failed');
+    }
+
+    const data = await res.json();
+    localStorage.setItem('access_token', data.access);  // Corrigir para 'access_token'
+    localStorage.setItem('refresh_token', data.refresh);  // Corrigir para 'refresh_token'
+    
+    alert('Login successful!');
+    window.location.href = '/';
+  } catch (err) {
+    const errorDiv = document.getElementById('login-error');
+    errorDiv.textContent = err.message;
+    errorDiv.classList.remove('d-none');
+    setTimeout(() => errorDiv.classList.add('d-none'), 5000);
+  }
+};
+
+document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+
+</script>
+{% endblock content %}

@@ -93,6 +93,8 @@ DATABASES = {
 }
 
 
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -139,9 +141,10 @@ if DEBUG:
     ]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication'
-      ],
-    'DEFAULT_RENDERER_CLASSES': DEFAULT_RENDERER_CLASSES
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Adiciona JWT
+        'rest_framework.authentication.SessionAuthentication',  # Mantém a autenticação por sessão
+    ],
+    'DEFAULT_RENDERER_CLASSES': DEFAULT_RENDERER_CLASSES,
 }
   
 

@@ -18,10 +18,11 @@ class TweetLikeSerializer(serializers.ModelSerializer):
 
 class TweetSerializer(serializers.ModelSerializer):
     likes = serializers.SerializerMethodField(read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)  # Corrige o campo username
 
     class Meta:
         model = Tweet
-        fields = ['id', 'content', 'likes']
+        fields = ['id', 'content', 'likes', 'username']  # Inclui o campo username
 
     def get_likes(self, obj):
         return obj.likes.count()
