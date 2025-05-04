@@ -78,15 +78,18 @@ def tweet_detail_view(request, tweet_id, *args, **kwargs):
 @permission_classes([IsAuthenticated])  # Exige autenticação
 def tweet_delete_view(request, tweet_id, *args, **kwargs):
     try:
+        # Busca o tweet pelo ID
         tweet = Tweet.objects.get(id=tweet_id)
     except Tweet.DoesNotExist:
         return Response({"message": "Tweet not found"}, status=404)
 
+    # Verifica se o usuário autenticado é o autor do tweet
     if tweet.user != request.user:
         return Response({"message": "You do not have permission to delete this tweet"}, status=403)
 
+    # Deleta o tweet
     tweet.delete()
-    return Response({"message": "Tweet deleted"}, status=200)
+    return Response({"message": "Tweet deleted successfully"}, status=200)
 # Curtir ou descurtir um tweet
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])  # Exige autenticação

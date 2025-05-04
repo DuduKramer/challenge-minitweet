@@ -47,10 +47,10 @@ const createTweetElement = ({ id, content, likes, username }) => {
     <button class="btn btn-sm btn-primary like-btn" data-id="${id}" data-likes="${likes}" data-liked="false">
       Like (${likes})
     </button>
-    <button class="btn btn-sm btn-danger delete-btn" data-id="${id}">
-      Delete
-    </button>
     ${username === localStorage.getItem('username') ? `
+      <button class="btn btn-sm btn-danger delete-btn" data-id="${id}">
+        Delete
+      </button>
       <button class="btn btn-sm btn-warning edit-btn" data-id="${id}">
         Edit
       </button>
@@ -59,11 +59,15 @@ const createTweetElement = ({ id, content, likes, username }) => {
 
   // Adiciona o evento de curtir
   const likeButton = tweetDiv.querySelector('.like-btn');
-  likeButton.addEventListener('click', handleLike);
+  if (likeButton) {
+    likeButton.addEventListener('click', handleLike);
+  }
 
   // Adiciona o evento de deletar
   const deleteButton = tweetDiv.querySelector('.delete-btn');
-  deleteButton.addEventListener('click', handleDelete);
+  if (deleteButton) {
+    deleteButton.addEventListener('click', handleDelete);
+  }
 
   // Adiciona o evento de edição
   const editButton = tweetDiv.querySelector('.edit-btn');
@@ -104,10 +108,12 @@ const handleDelete = async (event) => {
       throw new Error('Failed to delete tweet');
     }
 
-    button.closest('.tweet').remove(); // Remove o tweet do DOM
+    // Remove o tweet do DOM
+    button.closest('.tweet').remove();
+    alert('Tweet deleted successfully!');
   } catch (error) {
     console.error('Failed to delete tweet:', error);
-    alert('Could not delete tweet. Please try again.');
+    alert('Error deleting tweet. Please try again.');
   }
 };
 const renderTweets = (tweets) => {
