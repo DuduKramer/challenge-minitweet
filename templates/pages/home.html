@@ -17,9 +17,22 @@
   </div>
 </div>
 
+!-- Seção para exibir usuários disponíveis para seguir -->
+<div class="row mt-5">
+  <div class="col-md-6 mx-auto col-10">
+    <h3>Users to Follow</h3>
+    <div id="users-container">
+      Loading users...
+    </div>
+  </div>
+</div>
+
 <div class="row" id="tweets-container">
   Loading...
 </div>
+
+
+
 
 <script>
 const getJWTToken = () => {
@@ -68,6 +81,8 @@ const createTweetElement = ({ id, content, likes, username }) => {
   if (deleteButton) {
     deleteButton.addEventListener('click', handleDelete);
   }
+
+  
 
   // Adiciona o evento de edição
   const editButton = tweetDiv.querySelector('.edit-btn');
@@ -131,6 +146,85 @@ const renderTweets = (tweets) => {
   });
 };
 
+const handleFollowToggle = async (event) => {
+  const button = event.currentTarget;
+  const username = button.dataset.username;
+  const token = localStorage.getItem('access'); // Obtém o token de acesso
+
+  try {
+    const res = await fetch(`/api/users/${username}/follow-toggle/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`, // Inclui o token no cabeçalho
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to toggle follow status');
+    }
+
+    const data = await res.json();
+    alert(data.message);
+
+    // Atualiza o botão
+    button.classList.toggle('btn-primary');
+    button.classList.toggle('btn-danger');
+    button.textContent = button.textContent === 'Follow' ? 'Unfollow' : 'Follow';
+  } catch (err) {
+    console.error('Follow toggle error:', err);
+    alert('Error toggling follow status. Please try again.');
+  }
+};
+
+const createUserElement = ({ username, isFollowing }) => {
+  const userDiv = document.createElement('div');
+  userDiv.className = 'user col-12 border rounded mb-3 p-3 bg-light text-dark';
+
+  userDiv.innerHTML = `
+    <p class="fs-6 mb-2"><strong>${username}</strong></p>
+    <button class="btn btn-sm ${isFollowing ? 'btn-danger' : 'btn-primary'} follow-btn" data-username="${username}">
+      ${isFollowing ? 'Unfollow' : 'Follow'}
+    </button>
+  `;
+
+  const followButton = userDiv.querySelector('.follow-btn');
+  followButton.addEventListener('click', handleFollowToggle);
+
+  return userDiv;
+};
+
+const fetchUsers = async () => {
+  console.log('Fetching users...'); // Log para verificar se a função foi chamada
+  const token = localStorage.getItem('access'); // Obtém o token de acesso
+  if (!token) {
+    alert('You are not logged in. Redirecting to login page.');
+    window.location.href = '/login/';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/users/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`, // Inclui o token no cabeçalho
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to load users');
+    }
+
+    const data = await res.json();
+    console.log('Users fetched:', data); // Log dos dados retornados pela API
+    renderUsers(data); // Chama a função para renderizar os usuários
+  } catch (err) {
+    console.error('Error fetching users:', err.message);
+    document.getElementById('users-container').innerHTML = '<p>Error loading users.</p>';
+  }
+};
+
 const fetchTweets = async () => {
   const token = localStorage.getItem('access'); // Obtém o token de acesso do localStorage
   if (!token) {
@@ -163,6 +257,36 @@ const fetchTweets = async () => {
     document.getElementById('tweets-container').innerHTML = '<p>Error loading tweets.</p>';
   }
 };
+
+const renderUsers = (users) => {
+  console.log('Rendering users:', users); // Log dos usuários a serem renderizados
+  const container = document.getElementById('users-container');
+  container.innerHTML = ''; // Limpa o conteúdo anterior
+
+  if (!users.length) {
+    container.innerHTML = '<p>No users available to follow.</p>';
+    return;
+  }
+
+  users.forEach(user => {
+    console.log('Rendering user:', user); // Log de cada usuário
+    const userDiv = document.createElement('div');
+    userDiv.className = 'user-item border rounded p-3 mb-3';
+
+    userDiv.innerHTML = `
+      <p><strong>${user.username}</strong></p>
+      <button class="btn ${user.is_following ? 'btn-danger' : 'btn-primary'} follow-btn" data-username="${user.username}">
+        ${user.is_following ? 'Unfollow' : 'Follow'}
+      </button>
+    `;
+
+    const followButton = userDiv.querySelector('.follow-btn');
+    followButton.addEventListener('click', handleFollowToggle);
+
+    container.appendChild(userDiv);
+  });
+};
+
 
 const handleTweetSubmit = async (e) => {
   e.preventDefault();
@@ -277,6 +401,11 @@ async function handleLike(event) {
     alert('Could not update like. Please try again.');
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('Page loaded, fetching users...');
+  fetchUsers(); // Carrega a lista de usuários ao carregar a página
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   fetchTweets();

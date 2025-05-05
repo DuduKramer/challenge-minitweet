@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .forms import TweetForm
-from .models import Tweet
+from .models import Tweet, Profile
 from .serielizers import TweetSerializer, TweetLikeSerializer
 from django.contrib.auth.models import User
 from rest_framework import status
@@ -63,6 +63,26 @@ def tweet_edit_view(request, tweet_id, *args, **kwargs):
         return Response(serializer.data, status=200)
     return Response(serializer.errors, status=400)
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def follow_toggle_view(request, username, *args, **kwargs):
+    try:
+        target_user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return Response({"message": "User not found"}, status=404)
+
+    profile = request.user.profile
+    if profile.following.filter(id=target_user.profile.id).exists():
+        profile.following.remove(target_user.profile)
+        return Response({"message": f"You unfollowed {username}"}, status=200)
+    else:
+        profile.following.add(target_user.profile)
+        return Response({"message": f"You followed {username}"}, status=200)
+
 # Detalhes de um tweet
 @api_view(['GET'])
 def tweet_detail_view(request, tweet_id, *args, **kwargs):
@@ -114,13 +134,39 @@ def tweet_like_toggle_view(request, tweet_id, *args, **kwargs):
         "liked": liked,
         "likes_count": tweet.likes.count()
     }, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_list_view(request, *args, **kwargs):
+    user = request.user
+    # Exclui o próprio usuário da lista
+    qs = User.objects.exclude(id=user.id)
+    users = [
+        {
+            "username": u.username,
+            "is_following": user.profile.following.filter(user=u).exists()
+        }
+        for u in qs
+    ]
+    return Response(users, status=200)
 # Listagem de tweets
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])  # Exige autenticação
+@permission_classes([IsAuthenticated])
 def tweet_list_view(request, *args, **kwargs):
-    qs = Tweet.objects.all()
-    serializer = TweetSerializer(qs, many=True)
-    return Response(serializer.data)
+    user = request.user
+    try:
+        # Obtém os perfis que o usuário segue
+        following_profiles = user.profile.following.all()
+        # Obtém os usuários correspondentes
+        following_users = [profile.user for profile in following_profiles]
+        # Inclui o próprio usuário na lista
+        following_users.append(user)
+        # Busca os tweets desses usuários
+        qs = Tweet.objects.filter(user__in=following_users).order_by('-timestamp')
+        serializer = TweetSerializer(qs, many=True)
+        return Response(serializer.data)
+    except Profile.DoesNotExist:
+        return Response({"message": "User profile not found"}, status=404)
 
 # Criação de tweets
 @api_view(['POST'])
